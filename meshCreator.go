@@ -33,7 +33,7 @@ func main() {
 		MinY:                    -70,
 		MaxX:                    70,
 		MaxY:                    70,
-		NumberOfPointsPerSide:   9,
+		NumberOfPointsPerSide:   5,
 		NumberOfRepeatsPerPoint: 3,
 	}
 
