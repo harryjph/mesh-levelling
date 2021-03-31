@@ -2,6 +2,7 @@ package main
 
 import (
 	"MeshLevelling/mesh"
+	"errors"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
@@ -11,6 +12,7 @@ import (
 	"github.com/harry1453/go-common-file-dialog/cfdutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -27,11 +29,28 @@ var (
 	}
 )
 
+func textPrompt(app fyne.App, title, prompt string) <-chan string {
+	channel := make(chan string)
+	window := app.NewWindow(title)
+	textBox := widget.NewEntry()
+	window.SetContent(container.NewVBox(widget.NewLabel(prompt), textBox, widget.NewButton("OK", func() {
+		channel <- textBox.Text
+		window.Close()
+	})))
+	window.SetOnClosed(func() {
+		close(channel)
+	})
+	window.Resize(fyne.NewSize(256, 128))
+	window.Show()
+	return channel
+}
+
 func main() {
 	a := app.New()
 	w := a.NewWindow("Mesh Leveller")
 	w.Resize(fyne.NewSize(512, 256))
 
+	var currentMeshFilepath string
 	var currentMesh *mesh.Mesh
 
 	loadedLabel := widget.NewLabel("No Mesh Loaded")
@@ -39,8 +58,16 @@ func main() {
 
 	var selectedMaterial string
 
+	materialOffsetTextBox := widget.NewEntry()
 	materialSelector := widget.NewSelect([]string{}, func(newOption string) {
 		selectedMaterial = newOption
+		materialOffset, ok := currentMesh.MaterialOffsets[selectedMaterial]
+		if ok {
+			materialOffsetTextBox.Text = strconv.FormatFloat(materialOffset, 'f', 3, 64)
+		} else {
+			materialOffsetTextBox.Text = "Error"
+		}
+		materialOffsetTextBox.Refresh()
 	})
 
 	processButton := widget.NewButton("Process", func() {
@@ -86,6 +113,7 @@ func main() {
 					return
 				}
 				currentMesh = newMesh
+				currentMeshFilepath = file
 
 				var materials []string
 				for material := range currentMesh.MaterialOffsets {
@@ -98,7 +126,48 @@ func main() {
 				processButton.Enable()
 			}
 		}),
-		materialSelector,
+		container.NewGridWithColumns(
+			4,
+			materialSelector,
+			materialOffsetTextBox,
+			widget.NewButton("New", func() {
+				if currentMesh == nil {
+					dialog.NewError(errors.New("no mesh loaded"), w).Show()
+					return
+				}
+				go func() {
+					newMaterialName, ok := <-textPrompt(a, "Prompt", "Material Name:")
+					if ok {
+						for materialName := range currentMesh.MaterialOffsets {
+							if materialName == newMaterialName {
+								return
+							}
+						}
+						currentMesh.MaterialOffsets[newMaterialName] = 0
+						materialSelector.Options = append(materialSelector.Options, newMaterialName)
+						materialSelector.SetSelectedIndex(0)
+					}
+				}()
+			}),
+			widget.NewButton("Save", func() {
+				if currentMesh != nil && currentMeshFilepath != "" {
+					newMaterialOffset, err := strconv.ParseFloat(materialOffsetTextBox.Text, 64)
+					if err != nil {
+						dialog.NewError(err, w).Show()
+						return
+					}
+					currentMesh.MaterialOffsets[selectedMaterial] = newMaterialOffset
+
+					// Save Mesh
+					if err := mesh.SaveMesh(currentMesh, currentMeshFilepath); err != nil {
+						dialog.NewError(err, w).Show()
+						return
+					}
+
+					dialog.NewInformation("Saved", "Value Saved.", w).Show()
+				}
+			}),
+		),
 		processButton,
 	))
 

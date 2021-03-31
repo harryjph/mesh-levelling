@@ -33,7 +33,7 @@ func main() {
 		MinY:                    -70,
 		MaxX:                    70,
 		MaxY:                    70,
-		NumberOfPointsPerSide:   7,
+		NumberOfPointsPerSide:   9,
 		NumberOfRepeatsPerPoint: 3,
 	}
 
@@ -93,6 +93,8 @@ func main() {
 		Interpolator:    nil,
 		MaterialOffsets: make(map[string]float64),
 	}
+
+	resultingMesh.MaterialOffsets["Default"] = 0
 
 	if err := mesh.SaveMesh(&resultingMesh, "newMesh.mesh"); err != nil {
 		panic(err)

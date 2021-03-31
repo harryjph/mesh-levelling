@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	StartZ float64 = 57   // Don't bother going higher than this
-	ZStep  float64 = 0.05 // Number of mm per Z step (resolution)
-	EndZ   float64 = 50   // Don't ever go below this as it could crush the BLTouch
+	StartZ float64 = 57    // Don't bother going higher than this
+	ZStep  float64 = 0.025 // Number of mm per Z step (resolution)
+	EndZ   float64 = 50    // Don't ever go below this as it could crush the BLTouch
 
 	SpeedXY    = 80 // mm per second
 	SpeedZFast = 16 // mm per second
