@@ -1,0 +1,3 @@
+@echo off
+echo Building...
+go build -ldflags="-s -w -H windowsgui" -o "Mesh Leveller.exe" .
