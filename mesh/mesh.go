@@ -18,7 +18,7 @@ type Point struct {
 
 type Mesh struct {
 	Points       []Point
-	Interpolator func(x, y float64) (z float64)
+	Interpolator func(x, y float64) (z float64) `json:"-"`
 	// The adjustment for this material.
 	MaterialOffsets map[string]float64
 }

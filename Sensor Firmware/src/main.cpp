@@ -62,7 +62,7 @@ void setup() {
 }
 
 void handleCommand(WiFiClient& client, char command) {
-    Serial.println("Got command: " + command);
+    Serial.println("Got command: " + String(command));
     if (command == 'e') {
         BLTouch.write(10);
     } else if (command == 'r') {
