@@ -1,4 +1,4 @@
-package main
+package mesh
 
 import (
 	"bufio"
@@ -14,13 +14,13 @@ import (
 var (
 	absolutePositioningCommandRegex = regexp.MustCompile("\\s*G90")
 	relativePositioningCommandRegex = regexp.MustCompile("\\s*G91")
-	homeAllCommandRegex = regexp.MustCompile("\\s*G28")
-	homeMinimumCommandRegex = regexp.MustCompile("\\s*G161")
-	homeMaximumCommandRegex = regexp.MustCompile("\\s*G162")
-	moveCommandRegex = regexp.MustCompile("\\s*G[0-3] ")
-	xRegex = regexp.MustCompile("X([-.\\d]+)")
-	yRegex = regexp.MustCompile("Y([-.\\d]+)")
-	zRegex = regexp.MustCompile("Z([-.\\d]+)")
+	homeAllCommandRegex             = regexp.MustCompile("\\s*G28")
+	homeMinimumCommandRegex         = regexp.MustCompile("\\s*G161")
+	homeMaximumCommandRegex         = regexp.MustCompile("\\s*G162")
+	moveCommandRegex                = regexp.MustCompile("\\s*G[0-3] ")
+	xRegex                          = regexp.MustCompile("X([-.\\d]+)")
+	yRegex                          = regexp.MustCompile("Y([-.\\d]+)")
+	zRegex                          = regexp.MustCompile("Z([-.\\d]+)")
 )
 
 func isValid(value float64) bool {
@@ -129,6 +129,7 @@ func ProcessFile(filename string, mesh *Mesh, material string) (string, error) {
 					}
 					adjustedZ := z + zOffset
 					if isValid(adjustedZ) && adjustedZ != z {
+						// TODO split up moves to eg. go over a hill
 						line = updateRegex.ReplaceAllString(line, updatePrefix+"Z"+strconv.FormatFloat(adjustedZ, 'f', 3, 64))
 					}
 				}

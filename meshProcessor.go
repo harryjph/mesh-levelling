@@ -1,6 +1,7 @@
 package main
 
 import (
+	"MeshLevelling/mesh"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
@@ -26,12 +27,12 @@ var (
 	}
 )
 
-func runGui() {
+func main() {
 	a := app.New()
 	w := a.NewWindow("Mesh Leveller")
 	w.Resize(fyne.NewSize(512, 256))
 
-	var mesh *Mesh
+	var currentMesh *mesh.Mesh
 
 	loadedLabel := widget.NewLabel("No Mesh Loaded")
 	loadedLabel.Alignment = fyne.TextAlignCenter
@@ -43,10 +44,10 @@ func runGui() {
 	})
 
 	processButton := widget.NewButton("Process", func() {
-		if mesh != nil {
+		if currentMesh != nil {
 			fileName, err := cfdutil.ShowOpenFileDialog(openGCodeConfig)
 			if err == nil {
-				processedFile, err := ProcessFile(fileName, mesh, selectedMaterial)
+				processedFile, err := mesh.ProcessFile(fileName, currentMesh, selectedMaterial)
 				if err != nil {
 					dialog.NewError(err, w).Show()
 					return
@@ -79,15 +80,15 @@ func runGui() {
 		widget.NewButton("Load Mesh", func() {
 			file, err := cfdutil.ShowOpenFileDialog(openMeshConfig)
 			if err == nil {
-				newMesh, err := LoadMesh(file)
+				newMesh, err := mesh.LoadMesh(file)
 				if err != nil {
 					dialog.NewError(err, w).Show()
 					return
 				}
-				mesh = newMesh
+				currentMesh = newMesh
 
 				var materials []string
-				for material := range mesh.MaterialOffsets {
+				for material := range currentMesh.MaterialOffsets {
 					materials = append(materials, material)
 				}
 				materialSelector.Options = materials
