@@ -31,6 +31,10 @@ func isValid(value float64) bool {
 	return !(math.IsNaN(value) || math.IsInf(value, -1) || math.IsInf(value, 1))
 }
 
+func calculateDistance(x, y, z float64) float64 {
+	return math.Sqrt(math.Pow(x, 2) + math.Pow(y, 2) + math.Pow(z, 2))
+}
+
 func ProcessFile(filename string, mesh *Mesh, material string) (string, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -45,7 +49,9 @@ func ProcessFile(filename string, mesh *Mesh, material string) (string, error) {
 	relativePositioning := true
 	relativeExtruderPositioning := true
 	// The current printer position **without offset**
-	var extruder, speed, x, y, z, adjustedZ float64
+	var extruder, x, y, z float64
+	// The current printer position **with offset**
+	var speed, adjustedZ float64
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(strings.TrimSpace(line), ";") {
@@ -110,6 +116,29 @@ func ProcessFile(filename string, mesh *Mesh, material string) (string, error) {
 					return "", err
 				}
 				newAdjustedZ := newZ + zOffset
+
+				// Compensate for any increases in distance by increasing extrusion length and speed.
+				// Increases in distance come about due to the Z moving along with X and Y once mesh levelled, when only X and Y were supposed to move in the slicer's output.
+				// To calculate the distance we need to know the change in X, change in Y, change in Z without adjustment and change in Z with adjustment.
+				if isValid(x) && isValid(newX) && isValid(y) && isValid(newY) && isValid(z) && isValid(newZ) && isValid(adjustedZ) && isValid(newAdjustedZ) {
+					changeInX := newX - x
+					changeInY := newY - y
+					changeInZ := newZ - z
+					changeInAdjustedZ := newAdjustedZ - adjustedZ
+					oldDistance := calculateDistance(changeInX, changeInY, changeInZ)
+					if oldDistance != 0 { // prevent divide by 0
+						adjustedDistance := calculateDistance(changeInX, changeInY, changeInAdjustedZ)
+						distanceMultiplier := adjustedDistance / oldDistance
+						// Adjust speed to compensate for increase in distance
+						if isValid(newSpeed) {
+							newSpeed *= distanceMultiplier
+						}
+						if isValid(extruder) && isValid(newExtruder) {
+							// Adjust extrusion amount to compensate for increase in distance
+							newExtruder = extruder + ((newExtruder - extruder) * distanceMultiplier)
+						}
+					}
+				}
 
 				newCommand := new(strings.Builder)
 				newCommand.WriteString(gcodeCommand)
