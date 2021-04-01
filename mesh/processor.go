@@ -27,6 +27,11 @@ var (
 	zRegex                                  = regexp.MustCompile("Z([-.\\d]+)")
 )
 
+const (
+	Resolution          = 0.02 // Minimum move distance in mm
+	MaximumMeshDeviance = 0.02 // Maximum distance that extruder is allowed to deviate from the mesh due to gcode being too simple
+)
+
 func isValid(value float64) bool {
 	return !(math.IsNaN(value) || math.IsInf(value, -1) || math.IsInf(value, 1))
 }
@@ -90,22 +95,27 @@ func ProcessFile(filename string, mesh *Mesh, material string) (string, error) {
 					}
 				}
 
+				// The absolute extruder position **after** this command
 				newExtruder, err := handleMoveArgument(extruderRegex, relativeExtruderPositioning, extruder)
 				if err != nil {
 					return "", err
 				}
+				// The speed **after and during** this command
 				newSpeed, err := handleMoveArgument(speedRegex, false, speed)
 				if err != nil {
 					return "", err
 				}
+				// The absolute x position **after** this command
 				newX, err := handleMoveArgument(xRegex, relativePositioning, x)
 				if err != nil {
 					return "", err
 				}
+				// The absolute y position **after** this command
 				newY, err := handleMoveArgument(yRegex, relativePositioning, y)
 				if err != nil {
 					return "", err
 				}
+				// The absolute z position **after** this command
 				newZ, err := handleMoveArgument(zRegex, relativePositioning, z)
 				if err != nil {
 					return "", err
@@ -115,7 +125,38 @@ func ProcessFile(filename string, mesh *Mesh, material string) (string, error) {
 				if err != nil {
 					return "", err
 				}
+				// The adjusted absolute z position **after** this command
 				newAdjustedZ := newZ + zOffset
+
+				// Detect the maximum deviation from the mesh to ensure that the mesh is followed accurately.
+				// This avoids issues where eg. the bed is a perfect hill, and a command to move from one side to the other would crash into the hill.
+				if isValid(x) && isValid(newX) && isValid(y) && isValid(newY) {
+					changeInX := newX - x
+					changeInY := newY - y
+					// The angle of the moment in the XY plane
+					angle := math.Atan2(changeInY, changeInX)
+					// The distance of the movement in the XY plane
+					distance := math.Sqrt(math.Pow(changeInX, 2) + math.Pow(changeInY, 2))
+
+					// Slowly move along the line, trying to detect if the line strays too far from the mesh
+					for partialDistance := float64(0); partialDistance < distance; partialDistance += Resolution {
+						partialX := x + math.Cos(angle)*partialDistance
+						partialY := y + math.Sin(angle)*partialDistance
+						// The Z offset at this point
+						partialZOffset, err := mesh.GetZOffsetAtPosition(partialX, partialY, material)
+						if err != nil {
+							return "", err
+						}
+						partialZ := z + partialZOffset
+
+						// The Z position we'll be at if this line is not segmented
+						interpolatedZ := adjustedZ + ((newAdjustedZ - adjustedZ) * (partialDistance / distance))
+
+						if math.Abs(interpolatedZ-partialZ) > MaximumMeshDeviance {
+							return "", errors.New("Z deviated too far") // TODO split up the movement into multiple smaller movements
+						}
+					}
+				}
 
 				// Compensate for any increases in distance by increasing extrusion length and speed.
 				// Increases in distance come about due to the Z moving along with X and Y once mesh levelled, when only X and Y were supposed to move in the slicer's output.
