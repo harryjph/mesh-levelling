@@ -49,6 +49,7 @@ func SaveMesh(mesh *Mesh, filename string) error {
 }
 
 func (mesh *Mesh) GetZOffsetAtPosition(x, y float64, material string) (float64, error) {
+	// TODO slowly phase out the offset as we move up the print
 	materialOffset, ok := mesh.MaterialOffsets[material]
 	if !ok {
 		return 0, errors.New("material not found")

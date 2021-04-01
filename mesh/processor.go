@@ -28,8 +28,8 @@ var (
 )
 
 const (
-	Resolution          = 0.02 // Minimum move distance in mm
-	MaximumMeshDeviance = 0.02 // Maximum distance that extruder is allowed to deviate from the mesh due to gcode being too simple
+	Resolution           = 0.02 // Minimum move distance in mm
+	MaximumMeshDeviation = 0.02 // Maximum distance that extruder is allowed to deviate from the mesh due to gcode being too simple
 )
 
 func isValid(value float64) bool {
@@ -38,6 +38,34 @@ func isValid(value float64) bool {
 
 func calculateDistance(x, y, z float64) float64 {
 	return math.Sqrt(math.Pow(x, 2) + math.Pow(y, 2) + math.Pow(z, 2))
+}
+
+func writeGcodeMoveCommand(gcodeCommand string, newExtruder, oldExtruder, newSpeed, oldSpeed, newX, oldX, newY, oldY, newZ, oldZ float64, relativePositioning, relativeExtruderPositioning bool) string {
+	newCommand := new(strings.Builder)
+	newCommand.WriteString(gcodeCommand)
+	newCommand.WriteRune(' ')
+
+	writeParameter := func(oldValue, newValue float64, parameterPrefix rune, precision int, useRelativePositioning bool) {
+		tenPowPrecision := math.Pow10(precision)
+		newValueRounded := math.Round(newValue*tenPowPrecision) / tenPowPrecision
+		oldValueRounded := math.Round(oldValue*tenPowPrecision) / tenPowPrecision
+		if newValueRounded != oldValueRounded && isValid(newValue) && (!useRelativePositioning || isValid(oldValue)) {
+			newCommand.WriteRune(parameterPrefix)
+			if useRelativePositioning {
+				newCommand.WriteString(strconv.FormatFloat(newValue-oldValue, 'f', precision, 64))
+			} else {
+				newCommand.WriteString(strconv.FormatFloat(newValue, 'f', precision, 64))
+			}
+			newCommand.WriteRune(' ')
+		}
+	}
+
+	writeParameter(oldExtruder, newExtruder, 'E', 5, relativeExtruderPositioning)
+	writeParameter(oldSpeed, newSpeed, 'F', 0, false)
+	writeParameter(oldX, newX, 'X', 3, relativePositioning)
+	writeParameter(oldY, newY, 'Y', 3, relativePositioning)
+	writeParameter(oldZ, newZ, 'Z', 3, relativePositioning)
+	return strings.TrimSpace(newCommand.String())
 }
 
 func ProcessFile(filename string, mesh *Mesh, material string) (string, error) {
@@ -130,7 +158,8 @@ func ProcessFile(filename string, mesh *Mesh, material string) (string, error) {
 
 				// Detect the maximum deviation from the mesh to ensure that the mesh is followed accurately.
 				// This avoids issues where eg. the bed is a perfect hill, and a command to move from one side to the other would crash into the hill.
-				if isValid(x) && isValid(newX) && isValid(y) && isValid(newY) {
+				if (gcodeCommand == "G1" || gcodeCommand == "G2") && isValid(x) && isValid(newX) && isValid(y) && isValid(newY) && isValid(z) && isValid(newZ) && isValid(adjustedZ) && isValid(newAdjustedZ) {
+				segmentingBeginning:
 					changeInX := newX - x
 					changeInY := newY - y
 					// The angle of the moment in the XY plane
@@ -147,13 +176,32 @@ func ProcessFile(filename string, mesh *Mesh, material string) (string, error) {
 						if err != nil {
 							return "", err
 						}
-						partialZ := z + partialZOffset
 
-						// The Z position we'll be at if this line is not segmented
-						interpolatedZ := adjustedZ + ((newAdjustedZ - adjustedZ) * (partialDistance / distance))
+						// The Z position of the partial unadjusted move
+						partialZ := z + ((newZ - z) * (partialDistance / distance))
+						adjustedPartialZ := partialZ + partialZOffset
 
-						if math.Abs(interpolatedZ-partialZ) > MaximumMeshDeviance {
-							return "", errors.New("Z deviated too far") // TODO split up the movement into multiple smaller movements
+						// The Z position the extruder will be at (at this partial position) if this line is not segmented
+						unsegmentedPartialZ := adjustedZ + ((newAdjustedZ - adjustedZ) * (partialDistance / distance))
+
+						// Deviation from the mesh
+						deviation := math.Abs(unsegmentedPartialZ - adjustedPartialZ)
+
+						if deviation > MaximumMeshDeviation {
+							// The movement has deviated too far from the mesh. We need to turn it into 2 movements.
+							partialExtruder := extruder + ((newExtruder - extruder) * (partialDistance / distance))
+							partialCommand := writeGcodeMoveCommand(gcodeCommand, partialExtruder, extruder, newSpeed, speed, partialX, x, partialY, y, adjustedPartialZ, adjustedZ, relativePositioning, relativeExtruderPositioning) + " ; SEGMENT"
+							newLines = append(newLines, partialCommand)
+
+							// Update variables for the next check on the remaining section of the movement.
+							extruder = partialExtruder
+							x = partialX
+							y = partialY
+							z = partialZ
+							adjustedZ = adjustedPartialZ
+
+							// Reset, process the rest of this movement
+							goto segmentingBeginning
 						}
 					}
 				}
@@ -161,59 +209,34 @@ func ProcessFile(filename string, mesh *Mesh, material string) (string, error) {
 				// Compensate for any increases in distance by increasing extrusion length and speed.
 				// Increases in distance come about due to the Z moving along with X and Y once mesh levelled, when only X and Y were supposed to move in the slicer's output.
 				// To calculate the distance we need to know the change in X, change in Y, change in Z without adjustment and change in Z with adjustment.
-				if isValid(x) && isValid(newX) && isValid(y) && isValid(newY) && isValid(z) && isValid(newZ) && isValid(adjustedZ) && isValid(newAdjustedZ) {
-					changeInX := newX - x
-					changeInY := newY - y
-					changeInZ := newZ - z
-					changeInAdjustedZ := newAdjustedZ - adjustedZ
-					oldDistance := calculateDistance(changeInX, changeInY, changeInZ)
-					if oldDistance != 0 { // prevent divide by 0
-						adjustedDistance := calculateDistance(changeInX, changeInY, changeInAdjustedZ)
-						distanceMultiplier := adjustedDistance / oldDistance
-						// Adjust speed to compensate for increase in distance
-						if isValid(newSpeed) {
-							newSpeed *= distanceMultiplier
-						}
-						if isValid(extruder) && isValid(newExtruder) {
-							// Adjust extrusion amount to compensate for increase in distance
-							newExtruder = extruder + ((newExtruder - extruder) * distanceMultiplier)
-						}
-					}
-				}
+				// TODO this needs to take into account the move segmenting. Maybe move this into writeGcodeMoveCommand?
+				//if isValid(x) && isValid(newX) && isValid(y) && isValid(newY) && isValid(z) && isValid(newZ) && isValid(adjustedZ) && isValid(newAdjustedZ) {
+				//	changeInX := newX - x
+				//	changeInY := newY - y
+				//	changeInZ := newZ - z
+				//	changeInAdjustedZ := newAdjustedZ - adjustedZ
+				//	oldDistance := calculateDistance(changeInX, changeInY, changeInZ)
+				//	if oldDistance != 0 { // prevent divide by 0
+				//		adjustedDistance := calculateDistance(changeInX, changeInY, changeInAdjustedZ)
+				//		distanceMultiplier := adjustedDistance / oldDistance
+				//		// Adjust speed to compensate for increase in distance
+				//		if isValid(newSpeed) {
+				//			newSpeed *= distanceMultiplier
+				//		}
+				//		if isValid(extruder) && isValid(newExtruder) {
+				//			// Adjust extrusion amount to compensate for increase in distance
+				//			newExtruder = extruder + ((newExtruder - extruder) * distanceMultiplier)
+				//		}
+				//	}
+				//}
 
-				newCommand := new(strings.Builder)
-				newCommand.WriteString(gcodeCommand)
-				newCommand.WriteRune(' ')
-
-				writeParameter := func(oldValue, newValue float64, parameterPrefix rune, precision int, useRelativePositioning bool) {
-					tenPowPrecision := math.Pow10(precision)
-					newValueRounded := math.Round(newValue*tenPowPrecision) / tenPowPrecision
-					oldValueRounded := math.Round(oldValue*tenPowPrecision) / tenPowPrecision
-					if newValueRounded != oldValueRounded && isValid(newValue) && (!useRelativePositioning || isValid(oldValue)) {
-						newCommand.WriteRune(parameterPrefix)
-						if useRelativePositioning {
-							newCommand.WriteString(strconv.FormatFloat(newValue-oldValue, 'f', precision, 64))
-						} else {
-							newCommand.WriteString(strconv.FormatFloat(newValue, 'f', precision, 64))
-						}
-						newCommand.WriteRune(' ')
-					}
-				}
-
-				writeParameter(extruder, newExtruder, 'E', 5, relativeExtruderPositioning)
-				writeParameter(speed, newSpeed, 'F', 0, false)
-				writeParameter(x, newX, 'X', 3, relativePositioning)
-				writeParameter(y, newY, 'Y', 3, relativePositioning)
-				writeParameter(adjustedZ, newAdjustedZ, 'Z', 3, relativePositioning)
-
+				line = writeGcodeMoveCommand(gcodeCommand, newExtruder, extruder, newSpeed, speed, newX, x, newY, y, newAdjustedZ, adjustedZ, relativePositioning, relativeExtruderPositioning)
 				extruder = newExtruder
 				speed = newSpeed
 				x = newX
 				y = newY
 				z = newZ
 				adjustedZ = newAdjustedZ
-
-				line = strings.TrimSpace(newCommand.String())
 			} else if homeAllCommandRegex.MatchString(line) || homeMinimumCommandRegex.MatchString(line) {
 				movex := strings.ContainsRune(line, 'X')
 				movey := strings.ContainsRune(line, 'Y')
