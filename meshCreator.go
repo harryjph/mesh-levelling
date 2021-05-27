@@ -43,7 +43,8 @@ func main() {
 	}
 
 	meshPoints := make([]mesh.Point, 0, mcp.NumberOfPointsPerSide*mcp.NumberOfPointsPerSide)
-	var centerPoint *mesh.Point = nil
+	var averageZ float64
+	var averageZCount uint
 
 	log.Println("Starting...")
 	reverseYDirection := false
@@ -76,30 +77,16 @@ func main() {
 			z /= float64(mcp.NumberOfRepeatsPerPoint)
 			meshPoint := mesh.Point{X: xCoordinate, Y: yCoordinate, Z: z}
 			meshPoints = append(meshPoints, meshPoint)
-			if xCoordinate == 0 && yCoordinate == 0 {
-				centerPoint = &meshPoint
-			}
+			averageZ += z
+			averageZCount++
 		}
 		reverseYDirection = !reverseYDirection
 	}
 
-	if centerPoint == nil {
-		var z float64
-		for i := uint8(0); i < mcp.NumberOfRepeatsPerPoint; i++ {
-			newZ, err := bltouch.GetZAtPoint(printer, 0, 0)
-			if err != nil {
-				panic(err)
-			}
-			z += newZ
-		}
-		z /= float64(mcp.NumberOfRepeatsPerPoint)
-		meshPoint := mesh.Point{X: 0, Y: 0, Z: z}
-		meshPoints = append(meshPoints, meshPoint)
-		centerPoint = &meshPoint
-	}
+	averageZ /= float64(averageZCount)
 
 	resultingMesh := mesh.Mesh{
-		BLTouchHeight:   centerPoint.Z, // TODO this is not a good way of doing it, it produces the opposite of the desired effect
+		BLTouchHeight:   averageZ,
 		Points:          meshPoints,
 		Interpolator:    nil,
 		MaterialOffsets: make(map[string]float64),
@@ -113,12 +100,40 @@ func main() {
 
 	file, err := cfdutil.ShowOpenFileDialog(openMeshConfig)
 	if err == nil {
-		newMesh, err := mesh.LoadMesh(file)
+		oldMesh, err := mesh.LoadMesh(file)
 		if err == nil {
 			// Update existing mesh
-			newMesh.Points = resultingMesh.Points
+			oldMesh.Points = resultingMesh.Points
 
-			if err := mesh.SaveMesh(newMesh, file+"2"); err != nil {
+			// Update the existing mesh's BLTouchHeight
+			// Find a common point between the two meshes
+			commonPointFound := false
+			var i, j int
+		outerLoop:
+			for i = range resultingMesh.Points {
+				for j = range oldMesh.Points {
+					if resultingMesh.Points[i].X == oldMesh.Points[j].X && resultingMesh.Points[i].Y == oldMesh.Points[j].Y {
+						// Found a matching point
+						commonPointFound = true
+						break outerLoop
+					}
+				}
+			}
+			if commonPointFound {
+				newCommonZ := resultingMesh.Points[i].Z
+				oldCommonZ := oldMesh.Points[j].Z
+				oldMesh.BLTouchHeight += oldCommonZ - newCommonZ
+			} else {
+				log.Println("Could not find common point between the two meshes, switching to averaging method")
+				var oldAverageZ float64
+				for i := range oldMesh.Points {
+					oldAverageZ += oldMesh.Points[i].Z
+				}
+				oldAverageZ /= float64(len(oldMesh.Points))
+				oldMesh.BLTouchHeight += oldAverageZ - averageZ
+			}
+
+			if err := mesh.SaveMesh(oldMesh, file+"2"); err != nil {
 				panic(err)
 			}
 
