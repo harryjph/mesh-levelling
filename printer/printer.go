@@ -7,7 +7,9 @@ import (
 	"time"
 )
 
-const MovementTimePenalty = 100 * time.Millisecond
+const (
+	MovementTimeMultiplier = 1.5
+)
 
 type Printer struct {
 	conn       net.Conn
@@ -38,7 +40,7 @@ func (printer *Printer) MoveXY(x, y, speed float64) (time.Duration, error) {
 		return 0, err
 	}
 	distance := math.Sqrt(math.Pow(math.Abs(printer.lastKnownX-x), 2) + math.Pow(math.Abs(printer.lastKnownY-y), 2))
-	movementDuration := time.Duration(distance/speed*1000)*time.Millisecond + MovementTimePenalty
+	movementDuration := time.Duration(distance/speed*1000*MovementTimeMultiplier) * time.Millisecond
 	printer.lastKnownX = x
 	printer.lastKnownY = y
 	return movementDuration, nil
@@ -52,7 +54,7 @@ func (printer *Printer) MoveZ(z, speed float64) (time.Duration, error) {
 	if err := printer.execGcode(command); err != nil {
 		return 0, err
 	}
-	movementDuration := time.Duration(math.Abs(printer.lastKnownZ-z)/speed*1000)*time.Millisecond + MovementTimePenalty
+	movementDuration := time.Duration(math.Abs(printer.lastKnownZ-z)/speed*1000*MovementTimeMultiplier) * time.Millisecond
 	printer.lastKnownZ = z
 	return movementDuration, nil
 }

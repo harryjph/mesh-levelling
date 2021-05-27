@@ -59,6 +59,7 @@ func main() {
 	var selectedMaterial string
 
 	materialOffsetTextBox := widget.NewEntry()
+	blTouchHeightTextBox := widget.NewEntry()
 	materialSelector := widget.NewSelect([]string{}, func(newOption string) {
 		selectedMaterial = newOption
 		materialOffset, ok := currentMesh.MaterialOffsets[selectedMaterial]
@@ -121,11 +122,35 @@ func main() {
 				}
 				materialSelector.Options = materials
 				materialSelector.SetSelectedIndex(0)
+				blTouchHeightTextBox.SetText(strconv.FormatFloat(newMesh.BLTouchHeight, 'f', 3, 64))
 
 				loadedLabel.SetText("Mesh Loaded: " + filepath.Base(file))
 				processButton.Enable()
 			}
 		}),
+		container.NewGridWithColumns(
+			3,
+			widget.NewLabel("BLTouch Height:"),
+			blTouchHeightTextBox,
+			widget.NewButton("Save", func() {
+				if currentMesh != nil && currentMeshFilepath != "" {
+					newBLTouchHeight, err := strconv.ParseFloat(blTouchHeightTextBox.Text, 64)
+					if err != nil {
+						dialog.NewError(err, w).Show()
+						return
+					}
+					currentMesh.BLTouchHeight = newBLTouchHeight
+
+					// Save Mesh
+					if err := mesh.SaveMesh(currentMesh, currentMeshFilepath); err != nil {
+						dialog.NewError(err, w).Show()
+						return
+					}
+
+					dialog.NewInformation("Saved", "BLTouch Height Value Saved.", w).Show()
+				}
+			}),
+		),
 		container.NewGridWithColumns(
 			4,
 			materialSelector,
@@ -164,7 +189,7 @@ func main() {
 						return
 					}
 
-					dialog.NewInformation("Saved", "Value Saved.", w).Show()
+					dialog.NewInformation("Saved", "Material Offset Value Saved.", w).Show()
 				}
 			}),
 		),

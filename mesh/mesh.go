@@ -7,9 +7,6 @@ import (
 	"os"
 )
 
-// The offset as set in the calibration function in the settings menu
-const printerZOffset = 1
-
 type Point struct {
 	X float64
 	Y float64
@@ -17,8 +14,9 @@ type Point struct {
 }
 
 type Mesh struct {
-	Points       []Point
-	Interpolator func(x, y float64) (z float64) `json:"-"`
+	BLTouchHeight float64
+	Points        []Point
+	Interpolator  func(x, y float64) (z float64) `json:"-"`
 	// The adjustment for this material.
 	MaterialOffsets map[string]float64
 }
@@ -48,8 +46,7 @@ func SaveMesh(mesh *Mesh, filename string) error {
 	return json.NewEncoder(file).Encode(&mesh)
 }
 
-func (mesh *Mesh) GetZOffsetAtPosition(x, y float64, material string) (float64, error) {
-	// TODO slowly phase out the offset as we move up the print
+func (mesh *Mesh) GetZOffsetAtPosition(x, y, z float64, material string) (float64, error) {
 	materialOffset, ok := mesh.MaterialOffsets[material]
 	if !ok {
 		return 0, errors.New("material not found")
@@ -61,13 +58,17 @@ func (mesh *Mesh) GetZOffsetAtPosition(x, y float64, material string) (float64, 
 		for i := 0; i < len(mesh.Points); i++ {
 			X[i] = mesh.Points[i].X
 			Y[i] = mesh.Points[i].Y
-			Z[i] = mesh.Points[i].Z
+			Z[i] = mesh.Points[i].Z - mesh.BLTouchHeight
 		}
 		mesh.Interpolator = interpolate.Interp2d(X, Y, Z)
 	}
 	offset := mesh.Interpolator(x, y) + materialOffset
 	if isValid(offset) {
-		return offset - printerZOffset, nil
+		// Slowly phase out the mesh as we move up the print.
+		const ZeroMeshEffectZ = 10 // At 10mm Z in the original, unadjusted print, the mesh should no longer have any effect.
+		//offsetMultiplier := math.Min(1, math.Max(0, 1 - (z / ZeroMeshEffectZ)))
+		//return offset * offsetMultiplier, nil
+		return offset, nil
 	} else {
 		return 0, nil
 	}

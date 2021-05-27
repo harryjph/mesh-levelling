@@ -2,16 +2,16 @@ package bltouch
 
 import (
 	"MeshLevelling/printer"
-	"errors"
+	"fmt"
 	"math"
 	"net"
 	"time"
 )
 
 const (
-	StartZ float64 = 57    // Don't bother going higher than this
-	ZStep  float64 = 0.025 // Number of mm per Z step (resolution)
-	EndZ   float64 = 50    // Don't ever go below this as it could crush the BLTouch
+	StartZ float64 = 56   // Don't bother going higher than this
+	ZStep  float64 = 0.02 // Number of mm per Z step (resolution)
+	EndZ   float64 = 50   // Don't ever go below this as it could crush the BLTouch
 
 	SpeedXY    = 80 // mm per second
 	SpeedZFast = 16 // mm per second
@@ -49,20 +49,24 @@ func (bltouch *BLTouch) extend() error {
 }
 
 func (bltouch *BLTouch) hasTouched() (bool, error) {
+	var errors []error
 	for retryCount := 0; retryCount < 3; retryCount++ {
 		if _, err := bltouch.conn.Write([]byte{'t'}); err != nil {
+			errors = append(errors, err)
 			continue
 		}
 		buffer := make([]byte, 1)
-		if err := bltouch.conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+		if err := bltouch.conn.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+			errors = append(errors, err)
 			continue
 		}
 		if _, err := bltouch.conn.Read(buffer); err != nil {
+			errors = append(errors, err)
 			continue
 		}
 		return buffer[0] == '1', nil
 	}
-	return false, errors.New("failed to read bltouch after 3 attempts")
+	return false, fmt.Errorf("failed to read bltouch after 3 attempts: %v", errors)
 }
 
 func (bltouch *BLTouch) GetZAtPoint(printer *printer.Printer, x, y float64) (float64, error) {
@@ -100,5 +104,5 @@ func (bltouch *BLTouch) GetZAtPoint(printer *printer.Printer, x, y float64) (flo
 		}
 	}
 
-	return 0, errors.New("could not find bed without going below minimum safe Z")
+	return 0, fmt.Errorf("could not find bed without going below minimum safe Z")
 }

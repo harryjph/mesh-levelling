@@ -28,7 +28,7 @@ var (
 )
 
 const (
-	Resolution           = 0.02 // Minimum move distance in mm
+	Resolution           = 1    // Minimum move distance in mm
 	MaximumMeshDeviation = 0.02 // Maximum distance that extruder is allowed to deviate from the mesh due to gcode being too simple
 )
 
@@ -149,7 +149,7 @@ func ProcessFile(filename string, mesh *Mesh, material string) (string, error) {
 					return "", err
 				}
 
-				zOffset, err := mesh.GetZOffsetAtPosition(newX, newY, material)
+				zOffset, err := mesh.GetZOffsetAtPosition(newX, newY, newZ, material)
 				if err != nil {
 					return "", err
 				}
@@ -171,14 +171,14 @@ func ProcessFile(filename string, mesh *Mesh, material string) (string, error) {
 					for partialDistance := float64(0); partialDistance < distance; partialDistance += Resolution {
 						partialX := x + math.Cos(angle)*partialDistance
 						partialY := y + math.Sin(angle)*partialDistance
-						// The Z offset at this point
-						partialZOffset, err := mesh.GetZOffsetAtPosition(partialX, partialY, material)
-						if err != nil {
-							return "", err
-						}
 
 						// The Z position of the partial unadjusted move
 						partialZ := z + ((newZ - z) * (partialDistance / distance))
+						// The Z offset at this point
+						partialZOffset, err := mesh.GetZOffsetAtPosition(partialX, partialY, partialZ, material)
+						if err != nil {
+							return "", err
+						}
 						adjustedPartialZ := partialZ + partialZOffset
 
 						// The Z position the extruder will be at (at this partial position) if this line is not segmented
