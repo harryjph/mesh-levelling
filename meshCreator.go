@@ -27,7 +27,7 @@ func main() {
 	defer printer.Close()
 
 	log.Println("Connecting to BLTouch...")
-	bltouch, err := bltouch2.NewBLTouch("10.0.8.94:9988")
+	bltouch, err := bltouch2.NewBLTouch("HarryUnoWifiRev2.lan:9988")
 	if err != nil {
 		panic(err)
 	}
@@ -38,7 +38,7 @@ func main() {
 		MinY:                    -75,
 		MaxX:                    75,
 		MaxY:                    75,
-		NumberOfPointsPerSide:   5,
+		NumberOfPointsPerSide:   7,
 		NumberOfRepeatsPerPoint: 1,
 	}
 
@@ -98,50 +98,53 @@ func main() {
 		FileFilters: []cfd.FileFilter{{DisplayName: "Mesh (*.mesh)", Pattern: "*.mesh"}},
 	}
 
-	file, err := cfdutil.ShowOpenFileDialog(openMeshConfig)
-	if err == nil {
-		oldMesh, err := mesh.LoadMesh(file)
+	for {
+		file, err := cfdutil.ShowOpenFileDialog(openMeshConfig)
 		if err == nil {
-			// Update existing mesh
-			oldMesh.Points = resultingMesh.Points
-
-			// Update the existing mesh's BLTouchHeight
-			// Find a common point between the two meshes
-			commonPointFound := false
-			var i, j int
-		outerLoop:
-			for i = range resultingMesh.Points {
-				for j = range oldMesh.Points {
-					if resultingMesh.Points[i].X == oldMesh.Points[j].X && resultingMesh.Points[i].Y == oldMesh.Points[j].Y {
-						// Found a matching point
-						commonPointFound = true
-						break outerLoop
+			oldMesh, err := mesh.LoadMesh(file)
+			if err == nil {
+				// Update the existing mesh's BLTouchHeight FIRST before updating the mesh points
+				// Find a common point between the two meshes
+				commonPointFound := false
+				var i, j int
+			outerLoop:
+				for i = range resultingMesh.Points {
+					for j = range oldMesh.Points {
+						if resultingMesh.Points[i].X == oldMesh.Points[j].X && resultingMesh.Points[i].Y == oldMesh.Points[j].Y {
+							// Found a matching point
+							commonPointFound = true
+							break outerLoop
+						}
 					}
 				}
-			}
-			if commonPointFound {
-				newCommonZ := resultingMesh.Points[i].Z
-				oldCommonZ := oldMesh.Points[j].Z
-				oldMesh.BLTouchHeight += oldCommonZ - newCommonZ
-			} else {
-				log.Println("Could not find common point between the two meshes, switching to averaging method")
-				var oldAverageZ float64
-				for i := range oldMesh.Points {
-					oldAverageZ += oldMesh.Points[i].Z
+				if commonPointFound {
+					newCommonZ := resultingMesh.Points[i].Z
+					oldCommonZ := oldMesh.Points[j].Z
+					oldMesh.BLTouchHeight += oldCommonZ - newCommonZ
+				} else {
+					log.Println("Could not find common point between the two meshes, switching to averaging method")
+					var oldAverageZ float64
+					for i := range oldMesh.Points {
+						oldAverageZ += oldMesh.Points[i].Z
+					}
+					oldAverageZ /= float64(len(oldMesh.Points))
+					oldMesh.BLTouchHeight += oldAverageZ - averageZ
 				}
-				oldAverageZ /= float64(len(oldMesh.Points))
-				oldMesh.BLTouchHeight += oldAverageZ - averageZ
-			}
 
-			if err := mesh.SaveMesh(oldMesh, file+"2"); err != nil {
-				panic(err)
-			}
+				// Update existing mesh points
+				oldMesh.Points = resultingMesh.Points
 
-			log.Println("Complete! Mesh Updated.")
-			return
-		} else {
-			log.Println("Error opening Mesh. Creating mesh instead.")
+				if err := mesh.SaveMesh(oldMesh, file); err != nil {
+					panic(err)
+				}
+
+				log.Println("Complete! Mesh Updated.")
+				return
+			} else {
+				log.Println("Error opening Mesh. Creating mesh instead.")
+			}
 		}
+		break
 	}
 
 	if err := mesh.SaveMesh(&resultingMesh, "newMesh.mesh"); err != nil {
