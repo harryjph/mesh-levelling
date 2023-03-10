@@ -6,6 +6,7 @@ import (
 	"mesh-levelling/pkg/bltouch"
 	"mesh-levelling/pkg/mesh"
 	"mesh-levelling/pkg/printer"
+	"os"
 )
 
 type MeshCreationParameters struct {
@@ -103,6 +104,10 @@ func main() {
 	for {
 		file, err := zenity.SelectFile(openMeshConfig...)
 		if err == nil {
+			// Backup old file first
+			if err := copyFile(file, file+".backup"); err != nil {
+				log.Fatalln("Could not back up mesh")
+			}
 			oldMesh, err := mesh.LoadMesh(file)
 			if err == nil {
 				// Update the existing mesh's BLTouchHeight FIRST before updating the mesh points
@@ -154,4 +159,16 @@ func main() {
 	}
 
 	log.Println("Complete! Mesh Created.")
+}
+
+func copyFile(from, to string) error {
+	data, err := os.ReadFile(from)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(to, data, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
 }
