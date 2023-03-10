@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/ncruces/zenity"
 	"log"
 	"mesh-levelling/pkg/bltouch"
@@ -46,7 +47,14 @@ func main() {
 	var averageZ float64
 	var averageZCount uint
 
+	log.Println("Ready to start. MAKE SURE THE PRINTER HAS BEEN HOMED!!!")
+	log.Print("Press enter to start:")
+	_, _ = fmt.Scanln()
+
 	log.Println("Starting...")
+	if err := printer.StartingPosition(); err != nil {
+		panic(err)
+	}
 	reverseYDirection := false
 	numberOfPoints := mcp.NumberOfPointsPerSide * mcp.NumberOfPointsPerSide * mcp.NumberOfRepeatsPerPoint
 	numberOfPointsDone := 0

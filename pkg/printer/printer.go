@@ -23,15 +23,18 @@ func NewPrinter(address string) (*Printer, error) {
 	if err != nil {
 		return nil, err
 	}
-	printer := Printer{conn, 0, 0, 100}
+	return &Printer{conn, 0, 0, 100}, nil
+}
+
+func (printer *Printer) StartingPosition() error {
 	if err := printer.execGcode("G90"); err != nil { // Set to absolute positioning
-		return nil, err
+		return err
 	}
 	if err := printer.execGcode("G1 E0 F2000 X0 Y0 Z100"); err != nil { // Go to 0, 0, 100
-		return nil, err
+		return err
 	}
 	time.Sleep(5 * time.Second)
-	return &printer, nil
+	return nil
 }
 
 func (printer *Printer) MoveXY(x, y, speed float64) (time.Duration, error) {
