@@ -7,8 +7,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
-	"github.com/harry1453/go-common-file-dialog/cfd"
-	"github.com/harry1453/go-common-file-dialog/cfdutil"
+	"github.com/ncruces/zenity"
 	. "mesh-levelling/pkg/mesh"
 	"os"
 	"path/filepath"
@@ -17,15 +16,21 @@ import (
 )
 
 var (
-	openMeshConfig = cfd.DialogConfig{
-		Title:       "Open Mesh",
-		Role:        "open-mesh",
-		FileFilters: []cfd.FileFilter{{DisplayName: "Mesh (*.mesh)", Pattern: "*.mesh"}},
+	openMeshConfig = []zenity.Option{
+		zenity.Title("Open Mesh"),
+		zenity.FileFilter{
+			Name:     "Mesh",
+			Patterns: []string{"*.mesh"},
+			CaseFold: true,
+		},
 	}
-	openGCodeConfig = cfd.DialogConfig{
-		Title:       "Open GCode",
-		Role:        "open-gcode",
-		FileFilters: []cfd.FileFilter{{DisplayName: "GCode (*.g, *.gcode, *.gx)", Pattern: "*.g;*.gcode;*.gx"}},
+	openGCodeConfig = []zenity.Option{
+		zenity.Title("Open GCode"),
+		zenity.FileFilter{
+			Name:     "GCode",
+			Patterns: []string{"*.g", "*.gcode", "*.gx"},
+			CaseFold: true,
+		},
 	}
 )
 
@@ -73,7 +78,7 @@ func main() {
 
 	processButton := widget.NewButton("Process", func() {
 		if currentMesh != nil {
-			fileName, err := cfdutil.ShowOpenFileDialog(openGCodeConfig)
+			fileName, err := zenity.SelectFile(openGCodeConfig...)
 			if err == nil {
 				processedFile, err := ProcessFile(fileName, currentMesh, selectedMaterial)
 				if err != nil {
@@ -106,7 +111,8 @@ func main() {
 	w.SetContent(container.NewVBox(
 		loadedLabel,
 		widget.NewButton("Load Mesh", func() {
-			file, err := cfdutil.ShowOpenFileDialog(openMeshConfig)
+			println("hi")
+			file, err := zenity.SelectFile(openMeshConfig...)
 			if err == nil {
 				newMesh, err := LoadMesh(file)
 				if err != nil {

@@ -1,8 +1,7 @@
 package main
 
 import (
-	"github.com/harry1453/go-common-file-dialog/cfd"
-	"github.com/harry1453/go-common-file-dialog/cfdutil"
+	"github.com/ncruces/zenity"
 	"log"
 	"mesh-levelling/pkg/bltouch"
 	"mesh-levelling/pkg/mesh"
@@ -92,14 +91,17 @@ func main() {
 		MaterialOffsets: make(map[string]float64),
 	}
 
-	openMeshConfig := cfd.DialogConfig{
-		Title:       "Open Mesh",
-		Role:        "open-mesh",
-		FileFilters: []cfd.FileFilter{{DisplayName: "Mesh (*.mesh)", Pattern: "*.mesh"}},
+	openMeshConfig := []zenity.Option{
+		zenity.Title("Open Mesh"),
+		zenity.FileFilter{
+			Name:     "Mesh",
+			Patterns: []string{"*.mesh"},
+			CaseFold: true,
+		},
 	}
 
 	for {
-		file, err := cfdutil.ShowOpenFileDialog(openMeshConfig)
+		file, err := zenity.SelectFile(openMeshConfig...)
 		if err == nil {
 			oldMesh, err := mesh.LoadMesh(file)
 			if err == nil {
