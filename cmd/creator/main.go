@@ -20,7 +20,7 @@ type MeshCreationParameters struct {
 
 func main() {
 	log.Println("Connecting to printer...")
-	printer, err := printer.NewPrinter("10.0.8.8:8899")
+	printer, err := printer.NewPrinter("HarryPrinter:8899")
 	if err != nil {
 		panic(err)
 	}
