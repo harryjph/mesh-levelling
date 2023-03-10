@@ -1,12 +1,12 @@
 package main
 
 import (
-	bltouch2 "MeshLevelling/bltouch"
-	"MeshLevelling/mesh"
-	printer2 "MeshLevelling/printer"
 	"github.com/harry1453/go-common-file-dialog/cfd"
 	"github.com/harry1453/go-common-file-dialog/cfdutil"
 	"log"
+	"mesh-levelling/pkg/bltouch"
+	"mesh-levelling/pkg/mesh"
+	"mesh-levelling/pkg/printer"
 )
 
 type MeshCreationParameters struct {
@@ -20,14 +20,14 @@ type MeshCreationParameters struct {
 
 func main() {
 	log.Println("Connecting to printer...")
-	printer, err := printer2.NewPrinter("10.0.8.8:8899")
+	printer, err := printer.NewPrinter("10.0.8.8:8899")
 	if err != nil {
 		panic(err)
 	}
 	defer printer.Close()
 
 	log.Println("Connecting to BLTouch...")
-	bltouch, err := bltouch2.NewBLTouch("HarryUnoWifiRev2.lan:9988")
+	bltouch, err := bltouch.NewBLTouch("HarryUnoWifiRev2.lan:9988")
 	if err != nil {
 		panic(err)
 	}

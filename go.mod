@@ -1,4 +1,4 @@
-module MeshLevelling
+module mesh-levelling
 
 go 1.14
 

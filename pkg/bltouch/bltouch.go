@@ -1,9 +1,9 @@
 package bltouch
 
 import (
-	"MeshLevelling/printer"
 	"fmt"
 	"math"
+	"mesh-levelling/pkg/printer"
 	"net"
 	"time"
 )

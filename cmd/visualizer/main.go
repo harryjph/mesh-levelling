@@ -1,16 +1,16 @@
 package main
 
 import (
-	mesh2 "MeshLevelling/mesh"
 	"github.com/tidwall/pinhole"
 	"log"
 	"math"
+	. "mesh-levelling/pkg/mesh"
 	"sort"
 )
 
 func main() {
 	log.Println("Loading Mesh")
-	mesh, err := mesh2.LoadMesh("newMesh.mesh")
+	mesh, err := LoadMesh("newMesh.mesh")
 	if err != nil {
 		panic(err)
 	}

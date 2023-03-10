@@ -1,7 +1,6 @@
 package main
 
 import (
-	"MeshLevelling/mesh"
 	"errors"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -10,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/harry1453/go-common-file-dialog/cfd"
 	"github.com/harry1453/go-common-file-dialog/cfdutil"
+	. "mesh-levelling/pkg/mesh"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -51,7 +51,7 @@ func main() {
 	w.Resize(fyne.NewSize(512, 256))
 
 	var currentMeshFilepath string
-	var currentMesh *mesh.Mesh
+	var currentMesh *Mesh
 
 	loadedLabel := widget.NewLabel("No Mesh Loaded")
 	loadedLabel.Alignment = fyne.TextAlignCenter
@@ -75,7 +75,7 @@ func main() {
 		if currentMesh != nil {
 			fileName, err := cfdutil.ShowOpenFileDialog(openGCodeConfig)
 			if err == nil {
-				processedFile, err := mesh.ProcessFile(fileName, currentMesh, selectedMaterial)
+				processedFile, err := ProcessFile(fileName, currentMesh, selectedMaterial)
 				if err != nil {
 					dialog.NewError(err, w).Show()
 					return
@@ -108,7 +108,7 @@ func main() {
 		widget.NewButton("Load Mesh", func() {
 			file, err := cfdutil.ShowOpenFileDialog(openMeshConfig)
 			if err == nil {
-				newMesh, err := mesh.LoadMesh(file)
+				newMesh, err := LoadMesh(file)
 				if err != nil {
 					dialog.NewError(err, w).Show()
 					return
@@ -142,7 +142,7 @@ func main() {
 					currentMesh.BLTouchHeight = newBLTouchHeight
 
 					// Save Mesh
-					if err := mesh.SaveMesh(currentMesh, currentMeshFilepath); err != nil {
+					if err := SaveMesh(currentMesh, currentMeshFilepath); err != nil {
 						dialog.NewError(err, w).Show()
 						return
 					}
@@ -184,7 +184,7 @@ func main() {
 					currentMesh.MaterialOffsets[selectedMaterial] = newMaterialOffset
 
 					// Save Mesh
-					if err := mesh.SaveMesh(currentMesh, currentMeshFilepath); err != nil {
+					if err := SaveMesh(currentMesh, currentMeshFilepath); err != nil {
 						dialog.NewError(err, w).Show()
 						return
 					}
