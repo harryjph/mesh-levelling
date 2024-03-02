@@ -111,7 +111,6 @@ func main() {
 	w.SetContent(container.NewVBox(
 		loadedLabel,
 		widget.NewButton("Load Mesh", func() {
-			println("hi")
 			file, err := zenity.SelectFile(openMeshConfig...)
 			if err == nil {
 				newMesh, err := LoadMesh(file)
